@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   description      TEXT,
   posting_url      TEXT UNIQUE,
   date_posted      DATE,
-  vector_embedding VECTOR(768),  -- Gemini text-embedding-004 output dim
+  vector_embedding VECTOR(768),  -- gemini-embedding-001 truncated to 768 dims (MRL)
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
@@ -109,8 +109,7 @@ CREATE POLICY "jobs: public read" ON jobs
   FOR SELECT USING (true);
 
 -- ============================================================
--- VECTOR SIMILARITY INDEX (IVFFlat)
--- Adjust `lists` proportionally as job count grows.
+-- VECTOR SIMILARITY INDEX
 -- ============================================================
 CREATE INDEX IF NOT EXISTS jobs_vector_idx
   ON jobs USING ivfflat (vector_embedding vector_cosine_ops)

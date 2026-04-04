@@ -2,15 +2,13 @@
 LangChain + Gemini AI orchestration for CareerNode match analysis.
 Outputs a structured JSON: { ats_score, cover_letter, resume_tweaks }.
 """
-import json
-import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 
 from app.config import settings
 from app.models import Job, UserContext
-from app.schemas import MatchResult, ResumeTweak
+from app.schemas import MatchResult
 
 _SYSTEM_PROMPT = """\
 You are an elite technical resume strategist and ATS optimization engine. \
@@ -54,7 +52,7 @@ point rewrites with a rationale for each ATS keyword targeted.
 
 def _build_chain():
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         google_api_key=settings.google_api_key,
         temperature=0.3,
     )

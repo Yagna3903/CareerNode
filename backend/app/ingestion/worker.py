@@ -6,12 +6,14 @@ Or scheduled via APScheduler (scheduler.py).
 """
 import asyncio
 import logging
+import random
 import sys
-from datetime import date
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime
+from functools import partial
 
 import httpx
-from google.generativeai import embed_content
-import google.generativeai as genai
+from google import genai as google_genai
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import settings
@@ -20,11 +22,11 @@ from app.models import Job
 
 log = logging.getLogger(__name__)
 
+# google-genai client — confirmed to support gemini-embedding-001 on this key
+_genai_client = google_genai.Client(api_key=settings.google_api_key)
+_EMBED_MODEL = "models/gemini-embedding-001"  # MRL-trained; supports output_dimensionality truncation
+
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
-JSEARCH_HEADERS = {
-    "X-RapidAPI-Key": settings.rapidapi_key,
-    "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
-}
 GTA_QUERIES = [
     "software engineer Toronto",
     "backend developer Toronto",
@@ -33,123 +35,209 @@ GTA_QUERIES = [
     "software developer Mississauga Brampton Markham",
 ]
 
+# Thread pool for blocking Gemini embed calls (sdk is synchronous)
+_executor = ThreadPoolExecutor(max_workers=4)
 
-def _get_embedding(text: str) -> list[float]:
-    """Generate a 768-dim embedding via Gemini text-embedding-004."""
-    genai.configure(api_key=settings.google_api_key)
-    result = embed_content(
-        model="models/text-embedding-004",
-        content=text[:8000],  # truncate to avoid token limit
-        task_type="RETRIEVAL_DOCUMENT",
+
+# ── Embedding ─────────────────────────────────────────────────────────────────
+
+def _get_embedding_sync(text: str) -> list[float]:
+    """Embed text using gemini-embedding-001, truncated to 768 dims via MRL."""
+    from google.genai import types
+    result = _genai_client.models.embed_content(
+        model=_EMBED_MODEL,
+        contents=text[:8000],
+        config=types.EmbedContentConfig(output_dimensionality=768),
     )
-    return result["embedding"]
+    return result.embeddings[0].values
+
+
+async def _get_embedding(text: str) -> list[float]:
+    """Async wrapper — offloads the blocking embed call to a thread pool."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_executor, partial(_get_embedding_sync, text))
+
+
+# ── JSearch fetch with exponential backoff ────────────────────────────────────
+
+async def _fetch_page(
+    client: httpx.AsyncClient,
+    query: str,
+    page: int,
+    max_retries: int = 4,
+) -> list[dict]:
+    """Fetch one page of JSearch results with retry on 429/503."""
+    headers = {
+        "X-RapidAPI-Key": settings.rapidapi_key,
+        "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
+    }
+    params = {
+        "query": query,
+        "num_pages": "1",
+        "page": str(page),
+        "date_posted": "week",
+        "employment_types": "FULLTIME,PARTTIME,CONTRACTOR",
+        "country": "CA",
+    }
+
+    delay = 1.0
+    for attempt in range(max_retries):
+        try:
+            resp = await client.get(JSEARCH_URL, headers=headers, params=params)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                log.info("  [JSearch] page=%d query='%s' → %d results", page, query, len(data))
+                return data
+            elif resp.status_code in (429, 503):
+                wait = delay + random.uniform(0, delay * 0.3)
+                log.warning(
+                    "  [JSearch] %d on '%s' page %d — retrying in %.1fs (attempt %d/%d)",
+                    resp.status_code, query, page, wait, attempt + 1, max_retries,
+                )
+                await asyncio.sleep(wait)
+                delay *= 2
+            elif resp.status_code == 403:
+                log.error(
+                    "  [JSearch] 403 Forbidden for '%s' — verify your RapidAPI key "
+                    "and ensure JSearch is subscribed on your plan.",
+                    query,
+                )
+                return []
+            else:
+                log.warning("  [JSearch] HTTP %d for '%s' page %d", resp.status_code, query, page)
+                return []
+        except httpx.RequestError as exc:
+            log.warning("  [JSearch] Network error for '%s' page %d: %s", query, page, exc)
+            await asyncio.sleep(delay)
+            delay *= 2
+
+    log.error("  [JSearch] Exhausted retries for '%s' page %d", query, page)
+    return []
 
 
 async def _fetch_jobs(query: str, num_pages: int = 2) -> list[dict]:
-    """Call JSearch API and return a flat list of job results."""
+    """Fetch all pages for a query with a short inter-page delay."""
     all_jobs: list[dict] = []
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         for page in range(1, num_pages + 1):
-            params = {
-                "query": query,
-                "num_pages": str(page),
-                "page": str(page),
-                "date_posted": "week",
-                "job_requirements": "no_experience,under_3_years_experience,more_than_3_years_experience",
-                "employment_types": "FULLTIME,PARTTIME,CONTRACTOR",
-                "job_city": "Toronto",
-                "country": "CA",
-            }
-            resp = await client.get(JSEARCH_URL, headers=JSEARCH_HEADERS, params=params)
-            if resp.status_code != 200:
-                log.warning("JSearch returned %s for query '%s'", resp.status_code, query)
-                continue
-            data = resp.json().get("data", [])
-            all_jobs.extend(data)
+            jobs = await _fetch_page(client, query, page)
+            all_jobs.extend(jobs)
+            if page < num_pages:
+                await asyncio.sleep(1.2)  # respect burst limits
     return all_jobs
 
 
+# ── Job mapping ───────────────────────────────────────────────────────────────
+
 def _map_job(raw: dict) -> dict:
-    """Map a JSearch result dict to our Job schema."""
+    """Map a JSearch result dict to the jobs table schema."""
     posted_at = raw.get("job_posted_at_datetime_utc")
     posted_date: date | None = None
     if posted_at:
         try:
-            from datetime import datetime
             posted_date = datetime.fromisoformat(posted_at.replace("Z", "+00:00")).date()
         except ValueError:
             pass
 
-    description = raw.get("job_description", "")
+    url = raw.get("job_apply_link") or raw.get("job_google_link")
     return {
         "title": raw.get("job_title", "Unknown Title"),
         "company": raw.get("employer_name"),
-        "location": raw.get("job_city") or raw.get("job_state") or "GTA",
-        "description": description,
-        "posting_url": raw.get("job_apply_link") or raw.get("job_google_link"),
+        "location": (
+            raw.get("job_city")
+            or raw.get("job_state")
+            or raw.get("job_country")
+            or "GTA"
+        ),
+        "description": raw.get("job_description", ""),
+        "posting_url": url,
         "date_posted": posted_date,
     }
 
 
+# ── Main pipeline ─────────────────────────────────────────────────────────────
+
 async def run_ingestion(dry_run: bool = False) -> int:
     """
-    Full ingestion pipeline.
-    Returns count of new / updated rows upserted.
+    Full ingestion pipeline: fetch → deduplicate → embed → upsert.
+    Returns count of jobs processed.
     """
     seen_urls: set[str] = set()
     all_mapped: list[dict] = []
 
-    for query in GTA_QUERIES:
-        log.info("Fetching jobs for: %s", query)
+    for i, query in enumerate(GTA_QUERIES):
+        log.info("[%d/%d] Fetching: '%s'", i + 1, len(GTA_QUERIES), query)
         raw_jobs = await _fetch_jobs(query)
+
+        embed_tasks: list = []
+        valid_jobs: list[dict] = []
         for raw in raw_jobs:
             mapped = _map_job(raw)
             url = mapped.get("posting_url")
             if not url or url in seen_urls:
                 continue
             seen_urls.add(url)
+            valid_jobs.append(mapped)
+            embed_tasks.append(_get_embedding(f"{mapped['title']} {mapped['description']}"))
 
-            # Generate embedding
-            try:
-                mapped["vector_embedding"] = _get_embedding(
-                    f"{mapped['title']} {mapped['description']}"
-                )
-            except Exception as e:
-                log.warning("Embedding failed for %s: %s", mapped["title"], e)
-                mapped["vector_embedding"] = None
+        if embed_tasks:
+            embeddings = await asyncio.gather(*embed_tasks, return_exceptions=True)
+            for mapped, embedding in zip(valid_jobs, embeddings):
+                if isinstance(embedding, Exception):
+                    log.warning("Embedding failed for '%s': %s", mapped["title"], embedding)
+                    mapped["vector_embedding"] = None
+                else:
+                    mapped["vector_embedding"] = embedding
+                all_mapped.append(mapped)
 
-            all_mapped.append(mapped)
+        # Polite pause between queries
+        if i < len(GTA_QUERIES) - 1:
+            await asyncio.sleep(2.0)
 
-    log.info("Total unique jobs to upsert: %d", len(all_mapped))
+    log.info("Total unique jobs: %d", len(all_mapped))
 
     if dry_run:
-        log.info("[DRY RUN] Skipping DB write.")
+        log.info("[DRY RUN] Skipping DB write. Sample jobs:")
+        for j in all_mapped[:5]:
+            log.info("  • %s @ %s (%s)", j["title"], j["company"], j["location"])
         return len(all_mapped)
 
-    db = SessionLocal()
-    try:
-        stmt = (
-            pg_insert(Job)
-            .values(all_mapped)
-            .on_conflict_do_update(
-                index_elements=["posting_url"],
-                set_={
-                    "title": pg_insert(Job).excluded.title,
-                    "description": pg_insert(Job).excluded.description,
-                    "vector_embedding": pg_insert(Job).excluded.vector_embedding,
-                },
-            )
-        )
-        db.execute(stmt)
-        db.commit()
-    finally:
-        db.close()
+    if not all_mapped:
+        log.warning("No jobs fetched — DB write skipped.")
+        return 0
 
-    return len(all_mapped)
+    # Use the supabase client for upsert to avoid DATABASE_URL parsing issues
+    from supabase import create_client
+    sb = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    # Prepare rows — convert date objects and None embeddings to JSON-serialisable types
+    rows = []
+    for job in all_mapped:
+        row = dict(job)
+        if row.get("date_posted") is not None:
+            row["date_posted"] = row["date_posted"].isoformat()
+        # Supabase REST API represents vectors as lists → already correct type
+        rows.append(row)
+
+    try:
+        result = (
+            sb.table("jobs")
+            .upsert(rows, on_conflict="posting_url")
+            .execute()
+        )
+        log.info("✅ Upserted %d jobs to the database.", len(rows))
+    except Exception as exc:
+        log.error("DB upsert failed: %s", exc)
+        raise
+
+    return len(rows)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    )
     dry = "--dry-run" in sys.argv
     count = asyncio.run(run_ingestion(dry_run=dry))
     log.info("Done. Processed %d jobs.", count)

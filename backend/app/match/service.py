@@ -4,8 +4,8 @@ Outputs a structured JSON: { ats_score, cover_letter, resume_tweaks }.
 Accepts plain dicts (from supabase client) instead of ORM models.
 """
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
 
 from app.config import settings
 from app.schemas import MatchResult

@@ -18,19 +18,28 @@ def _sb():
 async def list_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    level: str | None = Query(default=None),
 ):
-    """Return a paginated list of jobs, newest first."""
+    """Return a paginated list of jobs, newest first. Optionally filter by level."""
     offset = (page - 1) * page_size
     end = offset + page_size - 1
 
-    resp = (
+    query = (
         _sb()
         .table("jobs")
         .select("id, title, company, location, description, posting_url, date_posted, created_at", count="exact")
-        .order("created_at", desc=True)
-        .range(offset, end)
-        .execute()
     )
+    
+    if level:
+        level_lower = level.lower()
+        if "intern" in level_lower:
+            query = query.or_("title.ilike.%intern%,description.ilike.%intern%")
+        elif "entry" in level_lower or "junior" in level_lower:
+            query = query.or_("title.ilike.%junior%,title.ilike.%entry%")
+        elif "senior" in level_lower or "lead" in level_lower:
+            query = query.or_("title.ilike.%senior%,title.ilike.%lead%,title.ilike.%principal%,title.ilike.%staff%")
+
+    resp = query.order("created_at", desc=True).range(offset, end).execute()
 
     return {
         "items": resp.data or [],

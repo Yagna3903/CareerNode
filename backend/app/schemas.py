@@ -25,15 +25,23 @@ class AuthResponse(BaseModel):
 # ── User Context ──────────────────────────────────────────────────────────────
 
 class UserContextCreate(BaseModel):
-    master_resume_text: str
+    master_resume_text: Optional[str] = None
     education_background: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    job_level_preference: Optional[str] = None
 
 
 class UserContextResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     master_resume_text: Optional[str]
-    education_background: str
+    education_background: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    phone_number: Optional[str]
+    job_level_preference: Optional[str]
 
     model_config = {"from_attributes": True}
 

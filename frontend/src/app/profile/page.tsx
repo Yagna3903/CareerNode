@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Save, User } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Navbar } from "@/components/Navbar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -75,21 +75,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href="/dashboard">
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div className="w-7 h-7 rounded-md gradient-brand" />
-          <span className="font-bold tracking-tight">Profile</span>
-          <div className="ml-auto">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
         {/* Header */}

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, User, RefreshCw, BriefcaseBusiness } from "lucide-react";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Navbar } from "@/components/Navbar";
 
 const PAGE_SIZE = 20;
 
@@ -29,18 +29,12 @@ export default function DashboardPage() {
   const [analysingId, setAnalysingId] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<{ job: Job; result: MatchOutput } | null>(null);
   const [userEmail, setUserEmail] = useState<string>("");
+  const [jobLevel, setJobLevel] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { router.push("/login"); return; }
-      setUserEmail(data.user.email ?? "");
-    });
-  }, []);
-
-  const fetchJobs = useCallback(async (p: number) => {
+  const fetchJobs = useCallback(async (p: number, level: string | null) => {
     setLoading(true);
     try {
-      const data = await api.getJobs(p, PAGE_SIZE);
+      const data = await api.getJobs(p, PAGE_SIZE, level || undefined);
       setJobs(data.items);
       setTotal(data.total);
     } catch {
@@ -50,7 +44,35 @@ export default function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { fetchJobs(page); }, [page, fetchJobs]);
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) { router.push("/login"); return; }
+      setUserEmail(data.session.user.email ?? "");
+      try {
+        const ctx = await api.getUserContext(data.session.access_token);
+        // Ensure they have completely finished onboarding
+        if (!ctx.job_level_preference || !ctx.master_resume_text) {
+          router.replace("/onboarding");
+          return;
+        }
+        setJobLevel(ctx.job_level_preference || null);
+        fetchJobs(page, ctx.job_level_preference || null);
+      } catch {
+        // Fallback for new users without a context setup yet
+        // A 404 from the API signifies they have no profile mapping
+        router.replace("/onboarding");
+      }
+    });
+  }, [supabase.auth, router, fetchJobs, page]);
+
+  // removed explicit useEffect on page since fetchJobs is called inside the session logic above
+  // but to handle native page transitions we retain a specific hook
+  
+  useEffect(() => {
+      if (userEmail) { // only trigger if we actually loaded the email previously
+         fetchJobs(page, jobLevel);
+      }
+  }, [page, userEmail, jobLevel, fetchJobs]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -84,28 +106,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md gradient-brand" />
-            <span className="font-bold tracking-tight">CareerNode</span>
-            <Badge variant="secondary" className="text-[10px] ml-1">
-              {total} jobs
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/profile">
-              <Button size="sm" variant="ghost" className="gap-1.5">
-                <User className="w-4 h-4" /> Profile
-              </Button>
-            </Link>
-            <Button size="sm" variant="ghost" onClick={handleSignOut} className="gap-1.5">
-              <LogOut className="w-4 h-4" /> Sign out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navbar jobCount={total} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Hero */}
@@ -128,7 +129,7 @@ export default function DashboardPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fetchJobs(page)}
+            onClick={() => fetchJobs(page, jobLevel)}
             className="gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Refresh

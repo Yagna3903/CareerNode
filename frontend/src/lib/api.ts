@@ -35,8 +35,12 @@ async function request<T>(
 
 export const api = {
   /** GET /api/jobs — paginated job feed (public) */
-  getJobs(page = 1, pageSize = 20): Promise<JobsPage> {
-    return request<JobsPage>(`/api/jobs?page=${page}&page_size=${pageSize}`);
+  getJobs(page = 1, pageSize = 20, level?: string): Promise<JobsPage> {
+    let url = `/api/jobs?page=${page}&page_size=${pageSize}`;
+    if (level) {
+      url += `&level=${encodeURIComponent(level)}`;
+    }
+    return request<JobsPage>(url);
   },
 
   /** POST /api/match — AI analysis for a job (auth required) */
@@ -54,19 +58,52 @@ export const api = {
       id: string;
       user_id: string;
       master_resume_text: string | null;
-      education_background: string;
+      education_background: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      phone_number: string | null;
+      job_level_preference: string | null;
     }>("/api/user-context", { token });
   },
 
   /** PUT /api/user-context (auth required) */
   saveUserContext(
     token: string,
-    data: { master_resume_text: string; education_background?: string }
+    data: { 
+        master_resume_text?: string; 
+        education_background?: string;
+        first_name?: string;
+        last_name?: string;
+        phone_number?: string;
+        job_level_preference?: string;
+    }
   ) {
     return request<{ id: string }>("/api/user-context", {
       method: "PUT",
       token,
       body: JSON.stringify(data),
+    });
+  },
+
+  /** POST /api/user-context/upload */
+  uploadResume(token: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    // Using raw fetch here since FormData automatically sets multipart boundary headers
+    // and omits application/json Content-Type
+    return fetch(`${BASE}/api/user-context/upload`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    }).then(async res => {
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Upload failed");
+      }
+      return res.json();
     });
   },
 };

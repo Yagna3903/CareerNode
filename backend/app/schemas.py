@@ -56,6 +56,9 @@ class JobResponse(BaseModel):
     description: Optional[str]
     posting_url: Optional[str]
     date_posted: Optional[date]
+    posted_at_datetime: Optional[datetime] = None
+    is_immediate_hire: bool = False
+    is_actively_recruiting: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

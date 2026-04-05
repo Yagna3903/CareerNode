@@ -52,8 +52,8 @@ async def match_job(
     )
     if not ctx_resp.data or not ctx_resp.data.get("master_resume_text"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Please upload your master resume in your profile before running a match.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your profile and upload a resume first.",
         )
     ctx = ctx_resp.data
 

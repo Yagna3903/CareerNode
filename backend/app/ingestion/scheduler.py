@@ -16,14 +16,14 @@ scheduler = AsyncIOScheduler()
 def start_scheduler() -> None:
     scheduler.add_job(
         run_ingestion,
-        trigger=IntervalTrigger(hours=6),
+        trigger=IntervalTrigger(hours=4),
         id="ingestion_job",
         name="GTA Job Ingestion",
         replace_existing=True,
         misfire_grace_time=300,  # tolerate up to 5 min late start
     )
     scheduler.start()
-    log.info("Ingestion scheduler started — runs every 6 hours.")
+    log.info("Ingestion scheduler started — runs every 4 hours.")
 
 
 def stop_scheduler() -> None:

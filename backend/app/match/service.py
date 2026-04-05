@@ -52,9 +52,10 @@ point rewrites with a rationale for each ATS keyword targeted.
 
 def _build_chain():
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         google_api_key=settings.google_api_key,
         temperature=0.3,
+        max_retries=0,  # Prevent proxy timeouts / socket drops
     )
     parser = PydanticOutputParser(pydantic_object=MatchResult)
     prompt = ChatPromptTemplate.from_messages(
@@ -71,16 +72,28 @@ async def run_match(job: dict, user_context: dict) -> MatchResult:
 
     Both `job` and `user_context` are plain dicts from the supabase client.
     """
+    import logging
+    from fastapi import HTTPException
+    
+    logger = logging.getLogger(__name__)
     chain, parser = _build_chain()
-    result: MatchResult = await chain.ainvoke(
-        {
-            "format_instructions": parser.get_format_instructions(),
-            "education": user_context.get("education_background", "Information Systems Engineering"),
-            "resume": user_context.get("master_resume_text", ""),
-            "job_title": job.get("title", ""),
-            "company": job.get("company") or "N/A",
-            "location": job.get("location") or "Greater Toronto Area",
-            "job_description": (job.get("description") or "")[:6000],
-        }
-    )
-    return result
+    
+    try:
+        result: MatchResult = await chain.ainvoke(
+            {
+                "format_instructions": parser.get_format_instructions(),
+                "education": user_context.get("education_background", "Information Systems Engineering"),
+                "resume": user_context.get("master_resume_text", ""),
+                "job_title": job.get("title", ""),
+                "company": job.get("company") or "N/A",
+                "location": job.get("location") or "Greater Toronto Area",
+                "job_description": (job.get("description") or "")[:6000],
+            }
+        )
+        return result
+    except Exception as e:
+        err_msg = str(e)
+        logger.error(f"Gemini API or Parsing Error: {err_msg}")
+        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+            raise HTTPException(status_code=502, detail="Google AI Quota Exceeded. Please check your Gemini API plan / wait for limits to reset.")
+        raise HTTPException(status_code=502, detail="AI Match Engine failed to process the request.")

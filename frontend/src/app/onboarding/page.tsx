@@ -3,13 +3,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, CheckCircle2, ArrowRight, Loader2, AlignLeft } from "lucide-react";
-
+import { UploadCloud, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Navbar } from "@/components/Navbar";
 import { api } from "@/lib/api";
@@ -23,13 +21,11 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Step 1 State
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [jobLevel, setJobLevel] = useState("");
 
-  // Step 2 State
   const [uploadMode, setUploadMode] = useState<"file" | "text">("file");
   const [file, setFile] = useState<File | null>(null);
   const [manualText, setManualText] = useState("");
@@ -45,9 +41,7 @@ export default function OnboardingPage() {
   }, [router, loading, supabase.auth]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-    }
+    if (acceptedFiles.length > 0) setFile(acceptedFiles[0]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
@@ -65,10 +59,8 @@ export default function OnboardingPage() {
       setErrorMsg("Please fill out your name and job preference.");
       return;
     }
-    
     setLoading(true);
     try {
-      // Save step 1 data
       if (sessionToken) {
         await api.saveUserContext(sessionToken, {
           first_name: firstName,
@@ -99,13 +91,11 @@ export default function OnboardingPage() {
     setLoading(true);
     try {
       if (!sessionToken) throw new Error("Not authenticated");
-      
       if (uploadMode === "file" && file) {
         await api.uploadResume(sessionToken, file);
       } else if (uploadMode === "text") {
         await api.saveUserContext(sessionToken, { master_resume_text: manualText });
       }
-
       router.push("/dashboard");
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to upload resume.");
@@ -115,140 +105,148 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative isolate">
+      <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-purple-500/5 via-background/50 to-background pointer-events-none -z-10" />
       <Navbar />
 
-      <main className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-lg">
-        {/* Step Indicators */}
-        <div className="flex items-center justify-center mb-8 gap-4 px-10">
-          <div className="flex flex-col items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-colors ${step >= 1 ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'bg-muted text-muted-foreground'}`}>
-              1
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Profile</span>
-          </div>
-          <div className={`flex-1 h-px ${step >= 2 ? 'bg-zinc-900 dark:bg-zinc-50' : 'bg-border'}`} />
-          <div className="flex flex-col items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm transition-colors ${step >= 2 ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900' : 'bg-muted text-muted-foreground'}`}>
-              2
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Resume</span>
-          </div>
-        </div>
-
-        <Card className="shadow-lg border-zinc-200 dark:border-zinc-800 bg-card/50 backdrop-blur-xl">
-          <CardHeader>
-            <CardTitle>{step === 1 ? "Let's personalize your experience" : "Upload your master resume"}</CardTitle>
-            <CardDescription>
-              {step === 1 ? "We use this to filter the best matching opportunities." : "Our AI uses this to calculate match scores and write tailored cover letters."}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            {errorMsg && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-md text-sm">
-                {errorMsg}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 py-12">
+        <div className="w-full max-w-xl">
+          {/* Step Indicators */}
+          <div className="flex items-center justify-center mb-10 gap-4 px-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-sm ${step >= 1 ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground border border-border'}`}>
+                1
               </div>
-            )}
-
-            {step === 1 && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name</Label>
-                    <Input id="first_name" placeholder="John" value={firstName} onChange={e => setFirstName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name</Label>
-                    <Input id="last_name" placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number (Optional)</Label>
-                  <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Job Level Preference</Label>
-                  <Select value={jobLevel} onValueChange={(val) => setJobLevel(val || "")}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select your experience level..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Internship">Internship</SelectItem>
-                      <SelectItem value="Entry Level">Entry Level (0-2 years)</SelectItem>
-                      <SelectItem value="Mid Level">Mid Level (3-5 years)</SelectItem>
-                      <SelectItem value="Senior">Senior (5+ years)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button className="w-full mt-6 glow-subtle" onClick={handleNextStep} disabled={loading}>
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue to Resume <ArrowRight className="w-4 h-4 ml-2" /></>}
-                </Button>
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'}`}>Profile</span>
+            </div>
+            <div className={`flex-1 h-px ${step >= 2 ? 'bg-foreground' : 'bg-border'}`} />
+            <div className="flex flex-col items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-sm ${step >= 2 ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground border border-border'}`}>
+                2
               </div>
-            )}
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}>Resume</span>
+            </div>
+          </div>
 
-            {step === 2 && (
-              <div className="space-y-6">
-                <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit mx-auto mb-6">
-                  <Button size="sm" variant={uploadMode === "file" ? "default" : "ghost"} onClick={() => setUploadMode("file")} className="h-8">PDF / DOCX</Button>
-                  <Button size="sm" variant={uploadMode === "text" ? "default" : "ghost"} onClick={() => setUploadMode("text")} className="h-8">Paste Text</Button>
+          <Card className="shadow-2xl border-border bg-card/80 backdrop-blur-xl rounded-2xl overflow-hidden">
+            <CardHeader className="bg-muted/30 border-b border-border pb-6 pt-8">
+              <CardTitle className="text-2xl font-extrabold tracking-tight">
+                {step === 1 ? "Initialize Identity" : "Upload Context Matrix"}
+              </CardTitle>
+              <CardDescription className="text-sm font-medium mt-1">
+                {step === 1 ? "Establishing baseline targeting vectors for the ingestion engine." : "Our LLM engine requires absolute context mapping to score matches accurately."}
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="p-8">
+              {errorMsg && (
+                <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold tracking-wide">
+                  {errorMsg}
                 </div>
+              )}
 
-                {uploadMode === "file" ? (
-                  <div 
-                    {...getRootProps()} 
-                    className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
-                      isDragActive ? 'border-zinc-500 bg-zinc-500/10' : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/50'
-                    }`}
-                  >
-                    <input {...getInputProps()} />
-                    {file ? (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-500 flex flex-items-center justify-center">
-                          <CheckCircle2 className="w-6 h-6 mt-3 ml-3" />
-                        </div>
-                        <p className="font-semibold text-sm">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">Click to replace file</p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                          <UploadCloud className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-semibold text-sm">Drop your resume here, or click to browse</p>
-                          <p className="text-xs text-muted-foreground">Supports PDF and DOCX files up to 10MB</p>
-                        </div>
-                      </div>
-                    )}
+              {step === 1 && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name" className="text-[13px] font-bold">First Name</Label>
+                      <Input id="first_name" placeholder="John" value={firstName} onChange={e => setFirstName(e.target.value)} className="h-11 rounded-lg" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name" className="text-[13px] font-bold">Last Name</Label>
+                      <Input id="last_name" placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} className="h-11 rounded-lg" />
+                    </div>
                   </div>
-                ) : (
+                  
                   <div className="space-y-2">
-                    <Label>Paste Master Resume</Label>
-                    <textarea 
-                      className="flex min-h-[250px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder="Paste your entire resume contents here..."
-                      value={manualText}
-                      onChange={e => setManualText(e.target.value)}
-                    />
+                    <Label htmlFor="phone" className="text-[13px] font-bold">Terminal Comms (Optional)</Label>
+                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} className="h-11 rounded-lg text-muted-foreground" />
                   </div>
-                )}
 
-                <div className="flex gap-3 pt-2 w-full">
-                  <Button variant="outline" className="flex-1" onClick={() => setStep(1)} disabled={loading}>Back</Button>
-                  <Button className="flex-1 glow-subtle" onClick={handleFinish} disabled={loading}>
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Complete Setup"}
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-[13px] font-bold">Target Seniority Vector</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div 
+                        onClick={() => setJobLevel("Internship")}
+                        className={`cursor-pointer rounded-xl border-2 p-4 transition-all duration-300 ${jobLevel === "Internship" ? "border-purple-500 bg-purple-500/5 shadow-md shadow-purple-500/10" : "border-border hover:border-border/80 hover:bg-muted bg-transparent"}`}
+                      >
+                        <div className="font-extrabold mb-1 text-[14px]">Internship</div>
+                        <div className="text-[12px] font-medium text-muted-foreground">Summer / Co-op block</div>
+                      </div>
+                      <div 
+                        onClick={() => setJobLevel("Entry Level")}
+                        className={`cursor-pointer rounded-xl border-2 p-4 transition-all duration-300 ${jobLevel === "Entry Level" ? "border-purple-500 bg-purple-500/5 shadow-md shadow-purple-500/10" : "border-border hover:border-border/80 hover:bg-muted bg-transparent"}`}
+                      >
+                        <div className="font-extrabold mb-1 text-[14px]">Entry Level</div>
+                        <div className="text-[12px] font-medium text-muted-foreground">0-2 years exposure</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button className="w-full mt-8 h-12 rounded-xl font-bold tracking-wider text-sm shadow-md" onClick={handleNextStep} disabled={loading}>
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Initialize Phase 2 <ArrowRight className="w-4 h-4 ml-2" /></>}
                   </Button>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit mx-auto mb-8 border border-border">
+                    <Button size="sm" variant={uploadMode === "file" ? "default" : "ghost"} onClick={() => setUploadMode("file")} className="h-9 px-6 rounded-lg font-bold">File Matrix</Button>
+                    <Button size="sm" variant={uploadMode === "text" ? "default" : "ghost"} onClick={() => setUploadMode("text")} className="h-9 px-6 rounded-lg font-bold">Raw Text</Button>
+                  </div>
+
+                  {uploadMode === "file" ? (
+                    <div 
+                      {...getRootProps()} 
+                      className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-300 ${
+                        isDragActive ? 'border-purple-500 bg-purple-500/10' : 'border-border hover:border-foreground/30 hover:bg-muted/50 bg-card'
+                      }`}
+                    >
+                      <input {...getInputProps()} />
+                      {file ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-500 flex flex-items-center justify-center border border-emerald-500/20 shadow-inner">
+                            <CheckCircle2 className="w-7 h-7 mt-3.5 ml-3.5" />
+                          </div>
+                          <p className="font-bold text-[15px]">{file.name}</p>
+                          <p className="text-[12px] font-semibold tracking-wider uppercase text-muted-foreground">Click block to re-select matrix</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center border border-border">
+                            <UploadCloud className="w-6 h-6 text-foreground/70" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-bold text-[14px]">Drag module here or click to browse</p>
+                            <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-widest mt-1">.PDF / .DOCX &bull; 10MB Limit</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-[13px] font-bold">Raw Matrix Input</Label>
+                      <textarea 
+                        className="flex min-h-[250px] w-full rounded-xl border border-border bg-background px-4 py-3 text-[13px] font-mono shadow-inner placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                        placeholder="Paste your entire resume contents explicitly mapped here..."
+                        value={manualText}
+                        onChange={e => setManualText(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 pt-4 w-full border-t border-border mt-8">
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl font-bold" onClick={() => setStep(1)} disabled={loading}>Retreat</Button>
+                    <Button className="flex-1 h-12 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-lg" onClick={handleFinish} disabled={loading}>
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Finalize Protocol"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

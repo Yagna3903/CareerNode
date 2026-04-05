@@ -11,6 +11,9 @@ export interface Job {
   description: string | null;
   posting_url: string | null;
   date_posted: string | null;
+  posted_at_datetime?: string | null;
+  is_immediate_hire?: boolean;
+  is_actively_recruiting?: boolean;
   created_at: string;
 }
 

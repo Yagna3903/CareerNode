@@ -1,10 +1,10 @@
 /**
  * Typed API client for CareerNode backend.
- * Base URL comes from NEXT_PUBLIC_API_URL env var.
+ * All requests use relative paths → Next.js rewrites() proxies them to FastAPI.
  */
 import { JobsPage, MatchOutput } from "@/lib/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE = "";
 
 async function request<T>(
   path: string,

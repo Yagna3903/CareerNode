@@ -30,30 +30,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px]" />
-        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] rounded-full bg-primary/8 blur-[100px]" />
-      </div>
+    <main className="min-h-screen flex items-center justify-center p-4 relative isolate">
+      {/* Premium Cinematic Background */}
+      <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-purple-500/10 via-background/50 to-background pointer-events-none -z-10" />
 
       <div className="relative w-full max-w-md">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg gradient-brand glow-violet" />
-            <span className="text-xl font-bold tracking-tight">CareerNode</span>
+          <div className="inline-flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-xl bg-foreground text-background flex items-center justify-center text-xl font-bold tracking-tight shadow-md">
+              CN
+            </div>
           </div>
-          <p className="text-muted-foreground text-sm">AI Resume Copilot for GTA Tech</p>
+          <h1 className="text-2xl font-bold tracking-tight mb-2 text-foreground">Create an account</h1>
+          <p className="text-muted-foreground text-sm">Join CareerNode to build your pipeline</p>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-2xl">
-          <h1 className="text-2xl font-bold mb-1">Create account</h1>
-          <p className="text-muted-foreground text-sm mb-6">
-            Start matching jobs in the Greater Toronto Area
-          </p>
-
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+        <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-xl p-8 shadow-2xl transition-all">
+          <form onSubmit={handleRegister} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[13px] font-semibold text-foreground">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -62,10 +58,11 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
+                className="h-11 rounded-lg"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-[13px] font-semibold text-foreground">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -74,16 +71,21 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
+                className="h-11 rounded-lg"
               />
             </div>
-            <Button type="submit" className="w-full glow-violet" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-11 text-sm font-semibold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-lg transition-all"
+              disabled={loading}
+            >
               {loading ? "Creating account…" : "Create Account"}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
+          <p className="text-center text-sm font-medium text-muted-foreground mt-8">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="text-foreground hover:text-purple-500 underline underline-offset-4 decoration-border hover:decoration-purple-500 transition-colors">
               Sign in
             </Link>
           </p>

@@ -13,6 +13,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -30,48 +31,56 @@
   --radius-xl: calc(var(--radius) * 1.4);
 }
 
-/* ── CareerNode Design System — Vercel/Linear aesthetic ───────────────────── */
+/* ── Light Mode (Ultra Clean & Responsive) ── */
 :root {
-  --background: var(--color-zinc-50);
-  --foreground: var(--color-zinc-950);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-950);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-950);
-  --primary: var(--color-zinc-900);
-  --primary-foreground: var(--color-zinc-50);
-  --secondary: var(--color-zinc-100);
-  --secondary-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-100);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --destructive: var(--color-red-500);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-200);
-  --ring: var(--color-zinc-900);
-  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #fefefe;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+  
+  --radius: 0.75rem;
+
+  --pulse-dot: #10b981;
 }
 
+/* ── Dark Mode (Pitch Black, Glowing Accents) ── */
 .dark {
-  --background: var(--color-zinc-950);
-  --foreground: var(--color-zinc-50);
-  --card: #0c0c0e; /* Slightly lighter than zinc-950 */
-  --card-foreground: var(--color-zinc-50);
-  --popover: #0c0c0e;
-  --popover-foreground: var(--color-zinc-50);
-  --primary: var(--color-zinc-50);
-  --primary-foreground: var(--color-zinc-900);
-  --secondary: var(--color-zinc-900);
-  --secondary-foreground: var(--color-zinc-50);
-  --muted: var(--color-zinc-900);
-  --muted-foreground: var(--color-zinc-400);
-  --accent: var(--color-zinc-800);
-  --accent-foreground: var(--color-zinc-50);
-  --destructive: var(--color-red-900);
-  --border: var(--color-zinc-800);
-  --input: var(--color-zinc-800);
-  --ring: var(--color-zinc-200);
+  --background: #000000;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #27272a;
+  --secondary-foreground: #ededed;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #ededed;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fafafa;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+
+  --pulse-dot: #34d399;
 }
 
 @layer base {
@@ -79,35 +88,18 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased selection:bg-purple-500/30 selection:text-white transition-colors duration-500;
   }
 }
 
-/* ── Utility classes ─────────────────────────────────────────────────────── */
-.glow-subtle {
-  box-shadow: 0 0 15px var(--color-zinc-300);
-  transition: box-shadow 0.25s ease;
-}
-.dark .glow-subtle {
-  box-shadow: 0 0 15px var(--color-zinc-800);
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-zinc-500 dark:from-white dark:to-zinc-400;
 }
 
-.gradient-brand {
-  background: var(--color-zinc-200);
-}
-.dark .gradient-brand {
-  background: var(--color-zinc-800);
+.text-gradient-purple {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-500 dark:from-purple-400 dark:via-fuchsia-400 dark:to-pink-400;
 }
 
-.card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.card-hover:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-zinc-300);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.04);
-}
-.dark .card-hover:hover {
-  border-color: var(--color-zinc-700);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+.glass-panel {
+  @apply bg-card/80 backdrop-blur-2xl border border-border shadow-sm;
 }

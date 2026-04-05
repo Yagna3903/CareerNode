@@ -8,6 +8,7 @@ import asyncio
 import logging
 import random
 import sys
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from functools import partial
@@ -28,11 +29,12 @@ _EMBED_MODEL = "models/gemini-embedding-001"  # MRL-trained; supports output_dim
 
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
 GTA_QUERIES = [
-    "software engineer Toronto",
-    "backend developer Toronto",
-    "full stack developer Toronto",
-    "systems engineer Greater Toronto Area",
-    "software developer Mississauga Brampton Markham",
+    "software engineer OR software developer Toronto",
+    "frontend developer OR backend developer Toronto",
+    "artificial intelligence OR machine learning engineer Toronto",
+    "data scientist OR data engineer Toronto",
+    "cloud engineer OR devops engineer Toronto",
+    "IT support OR systems administrator Toronto",
 ]
 
 # Thread pool for blocking Gemini embed calls (sdk is synchronous)
@@ -76,7 +78,7 @@ async def _fetch_page(
         "num_pages": "1",
         "page": str(page),
         "date_posted": "week",
-        "employment_types": "FULLTIME,PARTTIME,CONTRACTOR",
+        "employment_types": "FULLTIME,PARTTIME,CONTRACTOR,INTERN",
         "country": "CA",
     }
 
@@ -115,7 +117,7 @@ async def _fetch_page(
     return []
 
 
-async def _fetch_jobs(query: str, num_pages: int = 2) -> list[dict]:
+async def _fetch_jobs(query: str, num_pages: int = 1) -> list[dict]:
     """Fetch all pages for a query with a short inter-page delay."""
     all_jobs: list[dict] = []
     async with httpx.AsyncClient(timeout=30) as client:
@@ -140,8 +142,14 @@ def _map_job(raw: dict) -> dict:
             pass
 
     url = raw.get("job_apply_link") or raw.get("job_google_link")
+    title = raw.get("job_title", "Unknown Title")
+    desc = raw.get("job_description", "")
+    
+    is_urgent = bool(re.search(r'\burgent\b|\bimmediate\b', f"{title} {desc}", re.IGNORECASE))
+    is_actively = bool(re.search(r'\bactively recruiting\b', f"{title} {desc}", re.IGNORECASE))
+
     return {
-        "title": raw.get("job_title", "Unknown Title"),
+        "title": title,
         "company": raw.get("employer_name"),
         "location": (
             raw.get("job_city")
@@ -149,9 +157,12 @@ def _map_job(raw: dict) -> dict:
             or raw.get("job_country")
             or "GTA"
         ),
-        "description": raw.get("job_description", ""),
+        "description": desc,
         "posting_url": url,
         "date_posted": posted_date,
+        "posted_at_datetime": raw.get("job_posted_at_datetime_utc"),
+        "is_immediate_hire": is_urgent,
+        "is_actively_recruiting": is_actively,
     }
 
 

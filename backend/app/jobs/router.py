@@ -39,11 +39,12 @@ async def list_jobs(
     if level:
         level_lower = level.lower()
         if "intern" in level_lower:
-            query = query.or_("title.ilike.%intern%,title.ilike.%co-op%,description.ilike.%intern%")
+            # Internship mode: STRICTLY matches title interns/co-op
+            query = query.or_("title.ilike.%intern%,title.ilike.%co-op%,title.ilike.%internship%")
         elif "entry" in level_lower or "junior" in level_lower:
+            # Entry mode: STRICTLY matches title junior/entry/associate/grad
             query = query.or_(
-                "title.ilike.%junior%,title.ilike.%entry%,"
-                "description.ilike.%entry level%,description.ilike.%junior%"
+                "title.ilike.%junior%,title.ilike.%entry%,title.ilike.%associate%,title.ilike.%graduate%,title.ilike.%new grad%"
             )
             
         # Strongly exclude standard senior/mid-level identifiers across BOTH levels
@@ -51,7 +52,8 @@ async def list_jobs(
         senior_keywords = [
             "senior", "sr.", "staff", "principal", "manager", "director", "lead", 
             "architect", "head of", "president", "vp", 
-            " 3+", " 4+", " 5+", " 6+", " 7+"
+            " 3+", " 4+", " 5+", " 6+", " 7+", " 8+", " 10+",
+            "mid", "expert", " ii", " iii", "- 2", "- 3", "level 2", "level-2", "level 3", "level-3"
         ]
         for word in senior_keywords:
             query = query.not_.ilike("title", f"%{word}%")

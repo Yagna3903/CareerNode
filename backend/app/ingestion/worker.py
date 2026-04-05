@@ -29,12 +29,7 @@ _EMBED_MODEL = "models/gemini-embedding-001"  # MRL-trained; supports output_dim
 
 JSEARCH_URL = "https://jsearch.p.rapidapi.com/search"
 GTA_QUERIES = [
-    "software engineer OR software developer Toronto",
-    "frontend developer OR backend developer Toronto",
-    "artificial intelligence OR machine learning engineer Toronto",
-    "data scientist OR data engineer Toronto",
-    "cloud engineer OR devops engineer Toronto",
-    "IT support OR systems administrator Toronto",
+    "software OR IT OR developer OR data OR AI (entry level OR internship OR junior) Greater Toronto Area"
 ]
 
 # Thread pool for blocking Gemini embed calls (sdk is synchronous)
@@ -77,7 +72,7 @@ async def _fetch_page(
         "query": query,
         "num_pages": "1",
         "page": str(page),
-        "date_posted": "week",
+        "date_posted": "today",
         "employment_types": "FULLTIME,PARTTIME,CONTRACTOR,INTERN",
         "country": "CA",
     }

@@ -124,10 +124,17 @@ export default function DashboardPage() {
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-gradient max-w-xl">
             CareerNode Radar
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">
-            {userEmail ? <span className="font-semibold text-foreground">Signed in as {userEmail} <span className="text-border px-2">|</span> </span> : ""}
-            Click <strong>AI Match</strong> on any role to immediately compute your ATS fitness and generate a targeted cover letter via Gemini.
-          </p>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">
+              {userEmail ? <span className="font-semibold text-foreground">Signed in as {userEmail} <span className="text-border px-2">|</span> </span> : ""}
+              Click <strong>AI Match</strong> on any role to immediately compute your ATS fitness and generate a targeted cover letter via Gemini.
+            </p>
+            {jobLevel && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-sm shadow-sm whitespace-nowrap">
+                Filtered for: {jobLevel}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Toolbar */}

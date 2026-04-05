@@ -2,68 +2,82 @@
 Match router — triggers LangChain / Gemini AI analysis for a given job.
 Requires authentication.
 """
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from supabase import create_client
 
-from app.database import get_db
-from app.models import Job, UserContext, Application
-from app.schemas import MatchRequest, ApplicationResponse
+from app.config import settings
+from app.schemas import MatchRequest, ApplicationResponse, MatchResult
 from app.auth.dependencies import get_current_user
 from app.match.service import run_match
 
 router = APIRouter(prefix="/match", tags=["match"])
 
 
-@router.post("", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
+def _sb():
+    return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def match_job(
     body: MatchRequest,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     """
     Analyse a job posting against the authenticated user's context.
-    Returns an Application record containing the ATS score, cover letter,
-    and resume tweaks.
+    Returns the ATS score, cover letter, resume tweaks, and saves to applications table.
     """
+    sb = _sb()
     user_id = current_user["id"]
 
-    # Load job
-    job = db.get(Job, body.job_id)
-    if job is None:
+    # Load job (exclude heavy vector column)
+    job_resp = (
+        sb.table("jobs")
+        .select("id, title, company, location, description, posting_url, date_posted")
+        .eq("id", str(body.job_id))
+        .single()
+        .execute()
+    )
+    if not job_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    job = job_resp.data
 
     # Load user context
-    ctx = db.query(UserContext).filter(UserContext.user_id == user_id).first()
-    if ctx is None or not ctx.master_resume_text:
+    ctx_resp = (
+        sb.table("user_context")
+        .select("*")
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    if not ctx_resp.data or not ctx_resp.data.get("master_resume_text"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Please upload your master resume in your profile before running a match.",
         )
+    ctx = ctx_resp.data
 
-    # Run AI chain
-    result = await run_match(job=job, user_context=ctx)
+    # Run AI chain (LangChain + Gemini)
+    result: MatchResult = await run_match(job=job, user_context=ctx)
 
     # Upsert application row
-    existing = (
-        db.query(Application)
-        .filter(Application.user_id == user_id, Application.job_id == job.id)
-        .first()
+    app_payload = {
+        "user_id": user_id,
+        "job_id": str(body.job_id),
+        "ai_match_score": result.ats_score,
+        "generated_cover_letter": result.cover_letter,
+        "status": "pending",
+    }
+    app_resp = (
+        sb.table("applications")
+        .upsert(app_payload, on_conflict="user_id,job_id")
+        .execute()
     )
-    if existing:
-        existing.ai_match_score = result.ats_score
-        existing.generated_cover_letter = result.cover_letter
-        db.commit()
-        db.refresh(existing)
-        return ApplicationResponse.model_validate(existing)
+    if not app_resp.data:
+        raise HTTPException(status_code=500, detail="Failed to save application.")
 
-    app_row = Application(
-        user_id=user_id,
-        job_id=job.id,
-        ai_match_score=result.ats_score,
-        generated_cover_letter=result.cover_letter,
-        status="pending",
-    )
-    db.add(app_row)
-    db.commit()
-    db.refresh(app_row)
-    return ApplicationResponse.model_validate(app_row)
+    saved = app_resp.data[0]
+    return {
+        **saved,
+        "resume_tweaks": [t.model_dump() for t in result.resume_tweaks],
+    }

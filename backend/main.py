@@ -11,6 +11,7 @@ from app.ingestion.scheduler import start_scheduler, stop_scheduler
 from app.auth.router import router as auth_router
 from app.jobs.router import router as jobs_router
 from app.match.router import router as match_router
+from app.user_context.router import router as user_context_router
 
 
 @asynccontextmanager
@@ -39,9 +40,10 @@ app.add_middleware(
 )
 
 # ── Routers ────────────────────────────────────────────────────────────────────
-app.include_router(auth_router,  prefix="/api")
-app.include_router(jobs_router,  prefix="/api")
-app.include_router(match_router, prefix="/api")
+app.include_router(auth_router,         prefix="/api")
+app.include_router(jobs_router,         prefix="/api")
+app.include_router(match_router,        prefix="/api")
+app.include_router(user_context_router, prefix="/api")
 
 
 @app.get("/health", tags=["health"])
